@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="2b743f3f-3a4b-4bff-ab96-0f6cca4dacd9" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="bcaa0b93-7ab9-47f1-bd2c-478972d4aff7" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="Rupeshraj@45" database="data" />
+	</db:config>
+	<flow name="manual_watermarkingFlow" doc:id="2111fbe7-3dbd-4090-8334-546d1cc4ed2e" initialState="started">
+		<http:listener doc:name="Listener" doc:id="4d318b13-8013-484e-9bf5-7b50d8f8af22" config-ref="HTTP_Listener_config" path="/manual"/>
+<!-- [STUDIO:"Transform Message"]		<ee:transform doc:name="Transform Message" doc:id="a54ba845-d7a2-4006-910e-8ca342c533b5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+payload map((item,index)->{
+	"serialno": item
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform> [STUDIO] -->
+		<os:retrieve doc:name="Retrieve" doc:id="deafbcad-43dc-436f-a3eb-013ef68c0df5" key="serial_no">
+			<os:default-value ><![CDATA[0]]></os:default-value>
+		</os:retrieve>
+		<db:select doc:name="Select" doc:id="e03f7294-fe23-4f44-bbfb-e04a3e001c3c" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from details where serial_no > :serial_no]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	"serial_no":payload
+}]]]></db:input-parameters>
+		
+</db:select>
+<choice doc:name="Choice" doc:id="91477f94-6a9a-4d73-90e2-0897fd840198" >
+			<when expression="#[sizeOf(payload) &gt; 0]">
+				<os:store doc:name="Store" doc:id="258ed640-3f01-4759-a923-b761bf3233da" key="serial_no">
+			<os:value><![CDATA[#[(payload.serial_no orderBy -$)[0]]]]></os:value>
+		</os:store>
+				<ee:transform doc:name="Transform Message" doc:id="1ad3a574-81a7-42e8-a1b6-33f61bc97faf">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="1aa9875f-2363-4ba4-ba44-7c3c83559da0" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"no records"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<!-- [STUDIO:"Insert"]		<db:insert doc:name="Insert" doc:id="3a5cd763-a592-4de4-b2d3-6d6de77133e7" config-ref="Database_Config">
+			<db:input-parameters ><![CDATA[#[{
+"status":"processed"
+}]]]></db:input-parameters>
+		
+</db:insert> [STUDIO] -->
+		<!-- [STUDIO:"Bulk update"]		<db:bulk-update doc:name="Bulk update" doc:id="a3f00555-f264-4f19-a373-21670b80e2d4" config-ref="Database_Config">
+			<db:sql ><![CDATA[UPDATE details SET status = 'processed' WHERE serial_no = :serialno]]></db:sql>
+		</db:bulk-update> [STUDIO] -->
+	</flow>
+</mule>
